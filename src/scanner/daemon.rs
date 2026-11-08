@@ -201,6 +201,15 @@ impl ScannerDaemon {
                     };
 
                     append_hit_to_json(&config.output_json, &wallet_hit);
+
+                    // Dispatch instant Telegram "Goat found" alert (Security: NEVER transmits phrase)
+                    send_telegram_goat_alert(
+                        &hit.matched_address,
+                        &hit.matched_via,
+                        balance_str,
+                        &hit.db_source,
+                        "24/7 Autonomous Daemon",
+                    ).await;
                 }
             }
 
@@ -312,4 +321,47 @@ fn append_hit_to_json(path: &Path, hit: &WalletHit) {
         serde_json::to_writer_pretty(file, &hits).ok();
     }
 }
+
+/// Instant Telegram "Goat found" Alert Dispatcher
+/// Strictly adheres to security policy: NEVER sends mnemonic seed phrases.
+pub async fn send_telegram_goat_alert(
+    address: &str,
+    chain: &str,
+    balance: Option<&str>,
+    source: &str,
+    mode: &str,
+) {
+    let token = std::env::var("TELEGRAM_BOT_TOKEN")
+        .unwrap_or_else(|_| "8688192916:AAE5Gm1-343pyASQrloRUIOyQ8aN406qE2c".to_string());
+    let chat_id = std::env::var("TELEGRAM_CHAT_ID")
+        .unwrap_or_else(|_| "1488027094".to_string());
+
+    if !token.trim().is_empty() && !chat_id.trim().is_empty() {
+            let client = reqwest::Client::new();
+            let url = format!("https://api.telegram.org/bot{}/sendMessage", token.trim());
+            let bal_str = balance.unwrap_or("N/A");
+            let text = format!(
+                "🐐 <b>Goat found!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━\n🏷️ <b>Chain / Type:</b> <code>{}</code>\n📫 <b>Address:</b> <code>{}</code>\n💰 <b>Balance:</b> {}\n📂 <b>Source Partition:</b> <code>{}</code>\n🎯 <b>Discovery Mode:</b> <code>{}</code>\n\n⚡ <i>Namedox Rust Wallet Engine</i>",
+                chain.to_uppercase(),
+                address,
+                bal_str,
+                source,
+                mode
+            );
+
+            let body = serde_json::json!({
+                "chat_id": chat_id.trim(),
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": true
+            });
+
+            if let Ok(resp) = client.post(&url).json(&body).send().await {
+                if resp.status().is_success() {
+                    println!("   📢 Telegram 'Goat found' alert dispatched successfully!");
+                }
+            }
+    }
+}
+
 

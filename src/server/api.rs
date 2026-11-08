@@ -493,11 +493,20 @@ async fn handle_daemon_start(
             if !hits_this_tick.is_empty() {
                 hits_counter.fetch_add(hits_this_tick.len() as u64, Ordering::SeqCst);
                 let mut guard = recent_hits.write().await;
-                for h in hits_this_tick {
-                    guard.insert(0, h);
+                for h in &hits_this_tick {
+                    guard.insert(0, h.clone());
                     if guard.len() > 50 {
                         guard.pop();
                     }
+
+                    // Dispatch instant Telegram "Goat found" alert (Security: NEVER transmits phrase)
+                    crate::scanner::daemon::send_telegram_goat_alert(
+                        &h.matched_address,
+                        &h.matched_type,
+                        h.recorded_balance.as_deref(),
+                        &h.database_source,
+                        "24/7 Autonomous Daemon",
+                    ).await;
                 }
             }
 
