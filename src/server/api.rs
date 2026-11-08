@@ -36,6 +36,7 @@ pub struct AppState {
     pub daemon_hits: Arc<AtomicU64>,
     pub daemon_speed: Arc<AtomicU64>,
     pub daemon_started_at: Arc<tokio::sync::RwLock<Option<String>>>,
+    pub daemon_start_instant: Arc<tokio::sync::RwLock<Option<Instant>>>,
     pub recent_hits: Arc<tokio::sync::RwLock<Vec<WalletHit>>>,
     // Importer state
     pub import_running: Arc<AtomicBool>,
@@ -71,6 +72,7 @@ impl ApiServer {
             daemon_hits: Arc::new(AtomicU64::new(0)),
             daemon_speed: Arc::new(AtomicU64::new(0)),
             daemon_started_at: Arc::new(tokio::sync::RwLock::new(None)),
+            daemon_start_instant: Arc::new(tokio::sync::RwLock::new(None)),
             recent_hits: Arc::new(tokio::sync::RwLock::new(Vec::new())),
             import_running: Arc::new(AtomicBool::new(false)),
             import_bytes: Arc::new(AtomicU64::new(0)),
@@ -181,7 +183,7 @@ async fn handle_check_phrase(
                         recorded_tx_count: record.tx_count,
                         live_balance: live_bal.clone(),
                         live_tx_count: live_tx,
-                        found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                        found_timestamp: crate::config::now_iso(),
                     });
                 } else if live_bal.is_some() {
                     is_available = true;
@@ -195,7 +197,7 @@ async fn handle_check_phrase(
                         recorded_tx_count: None,
                         live_balance: live_bal.clone(),
                         live_tx_count: live_tx,
-                        found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                        found_timestamp: crate::config::now_iso(),
                     });
                 }
 
@@ -223,7 +225,7 @@ async fn handle_check_phrase(
                         recorded_tx_count: record.tx_count,
                         live_balance: btc_sw_live_bal.clone(),
                         live_tx_count: btc_sw_live_tx,
-                        found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                        found_timestamp: crate::config::now_iso(),
                     });
                 } else if btc_sw_live_bal.is_some() {
                     is_available = true;
@@ -237,7 +239,7 @@ async fn handle_check_phrase(
                         recorded_tx_count: None,
                         live_balance: btc_sw_live_bal.clone(),
                         live_tx_count: btc_sw_live_tx,
-                        found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                        found_timestamp: crate::config::now_iso(),
                     });
                 }
 
@@ -257,7 +259,7 @@ async fn handle_check_phrase(
                         recorded_tx_count: record.tx_count,
                         live_balance: None,
                         live_tx_count: None,
-                        found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                        found_timestamp: crate::config::now_iso(),
                     });
                 }
             }
@@ -377,6 +379,11 @@ async fn handle_daemon_stats(State(state): State<Arc<AppState>>) -> impl IntoRes
     let speed = state.daemon_speed.load(Ordering::SeqCst);
     let started_at = state.daemon_started_at.read().await.clone();
     let recent = state.recent_hits.read().await.clone();
+    let uptime_seconds = if is_running {
+        state.daemon_start_instant.read().await.map(|t| t.elapsed().as_secs()).unwrap_or(0)
+    } else {
+        0
+    };
 
     Json(serde_json::json!({
         "isRunning": is_running,
@@ -385,6 +392,7 @@ async fn handle_daemon_stats(State(state): State<Arc<AppState>>) -> impl IntoRes
         "addressesChecked": addrs,
         "speedAddrsPerSec": speed,
         "hitsFound": hits,
+        "uptimeSeconds": uptime_seconds,
         "recentHits": recent
     }))
 }
@@ -413,11 +421,12 @@ async fn handle_daemon_start(
     }
 
     state.daemon_running.store(true, Ordering::SeqCst);
-    *state.daemon_started_at.write().await = Some(format!("{:?}", std::time::SystemTime::now()));
+    *state.daemon_started_at.write().await = Some(crate::config::now_iso());
+    *state.daemon_start_instant.write().await = Some(Instant::now());
 
     let b_size = payload.batch_size.unwrap_or(500);
     let interval = payload.interval_ms.unwrap_or(0);
-    let _w_count = payload.word_count.unwrap_or(12);
+    let w_count = payload.word_count.unwrap_or(12);
 
     let running_flag = state.daemon_running.clone();
     let phrases_counter = state.daemon_phrases.clone();
@@ -441,9 +450,15 @@ async fn handle_daemon_start(
                 .into_par_iter()
                 .map(|_| {
                     let mut rng = rand::thread_rng();
-                    let mut entropy = [0u8; 16];
-                    rng.fill(&mut entropy);
-                    Mnemonic::from_entropy(&entropy).unwrap().to_string()
+                    if w_count == 24 {
+                        let mut entropy = [0u8; 32];
+                        rng.fill(&mut entropy);
+                        Mnemonic::from_entropy(&entropy).unwrap().to_string()
+                    } else {
+                        let mut entropy = [0u8; 16];
+                        rng.fill(&mut entropy);
+                        Mnemonic::from_entropy(&entropy).unwrap().to_string()
+                    }
                 })
                 .collect();
 
@@ -457,32 +472,52 @@ async fn handle_daemon_start(
                 .flat_map(|p| {
                     let mut hits = Vec::new();
                     if let Ok(derived) = engine_ref.derive_phrase(p, 1) {
+                        // Check ETH
                         if let Some(orig) = index_ref.find_origin(&derived.primary_eth) {
+                            let rec = index_ref.fetch_record_from_path(&orig, &derived.primary_eth);
                             hits.push(WalletHit {
                                 phrase: p.clone(),
                                 matched_address: derived.primary_eth.clone(),
                                 matched_type: "ETH".to_string(),
                                 derivation_index: 0,
                                 database_source: orig.file_name().unwrap_or_default().to_string_lossy().to_string(),
-                                recorded_balance: None,
-                                recorded_tx_count: None,
+                                recorded_balance: rec.as_ref().and_then(|r| r.balance.clone()),
+                                recorded_tx_count: rec.as_ref().and_then(|r| r.tx_count),
                                 live_balance: None,
                                 live_tx_count: None,
-                                found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                                found_timestamp: crate::config::now_iso(),
                             });
                         }
+                        // Check BTC SegWit
                         if let Some(orig) = index_ref.find_origin(&derived.primary_btc_segwit) {
+                            let rec = index_ref.fetch_record_from_path(&orig, &derived.primary_btc_segwit);
                             hits.push(WalletHit {
                                 phrase: p.clone(),
                                 matched_address: derived.primary_btc_segwit.clone(),
                                 matched_type: "BTC_SEGWIT".to_string(),
                                 derivation_index: 0,
                                 database_source: orig.file_name().unwrap_or_default().to_string_lossy().to_string(),
-                                recorded_balance: None,
-                                recorded_tx_count: None,
+                                recorded_balance: rec.as_ref().and_then(|r| r.balance.clone()),
+                                recorded_tx_count: rec.as_ref().and_then(|r| r.tx_count),
                                 live_balance: None,
                                 live_tx_count: None,
-                                found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                                found_timestamp: crate::config::now_iso(),
+                            });
+                        }
+                        // Check BTC Legacy
+                        if let Some(orig) = index_ref.find_origin(&derived.primary_btc_legacy) {
+                            let rec = index_ref.fetch_record_from_path(&orig, &derived.primary_btc_legacy);
+                            hits.push(WalletHit {
+                                phrase: p.clone(),
+                                matched_address: derived.primary_btc_legacy.clone(),
+                                matched_type: "BTC_LEGACY".to_string(),
+                                derivation_index: 0,
+                                database_source: orig.file_name().unwrap_or_default().to_string_lossy().to_string(),
+                                recorded_balance: rec.as_ref().and_then(|r| r.balance.clone()),
+                                recorded_tx_count: rec.as_ref().and_then(|r| r.tx_count),
+                                live_balance: None,
+                                live_tx_count: None,
+                                found_timestamp: crate::config::now_iso(),
                             });
                         }
                     }
@@ -499,7 +534,20 @@ async fn handle_daemon_start(
                         guard.pop();
                     }
 
-                    // Dispatch instant Telegram "Goat found" alert (Security: NEVER transmits phrase)
+                    // Save to master active_wallets.duckdb found_duckdb_wallets table
+                    let _ = index.save_found_wallet(
+                        &h.phrase,
+                        &h.matched_address,
+                        &h.matched_type,
+                        h.recorded_balance.as_deref(),
+                        h.recorded_tx_count,
+                        &h.database_source,
+                        Some(&h.matched_address),
+                        None,
+                        None,
+                    );
+
+                    // Dispatch instant Telegram "Goat found" alert
                     crate::scanner::daemon::send_telegram_goat_alert(
                         &h.matched_address,
                         &h.matched_type,
@@ -513,10 +561,11 @@ async fn handle_daemon_start(
             phrases_counter.fetch_add(phrases_count, Ordering::SeqCst);
             addrs_counter.fetch_add(phrases_count * 3, Ordering::SeqCst);
 
-            if last_speed_check.elapsed().as_secs() >= 2 {
+            let elapsed_sec = last_speed_check.elapsed().as_secs_f64();
+            if elapsed_sec >= 1.0 {
                 let current_p = phrases_counter.load(Ordering::SeqCst);
                 let diff = current_p - last_phrases;
-                let sp = ((diff * 3) as f64 / last_speed_check.elapsed().as_secs_f64()).round() as u64;
+                let sp = ((diff * 3) as f64 / elapsed_sec).round() as u64;
                 speed_counter.store(sp, Ordering::SeqCst);
                 last_phrases = current_p;
                 last_speed_check = Instant::now();
@@ -524,6 +573,8 @@ async fn handle_daemon_start(
 
             if interval > 0 {
                 tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
+            } else {
+                tokio::task::yield_now().await;
             }
         }
     });
@@ -536,6 +587,8 @@ async fn handle_daemon_start(
 
 async fn handle_daemon_stop(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     state.daemon_running.store(false, Ordering::SeqCst);
+    *state.daemon_start_instant.write().await = None;
+    state.daemon_speed.store(0, Ordering::SeqCst);
     Json(serde_json::json!({
         "success": true,
         "message": "Daemon stop signaled."

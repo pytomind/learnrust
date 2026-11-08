@@ -100,7 +100,7 @@ impl VerticalMatrixScanner {
                     recorded_tx_count: None,
                     live_balance: None,
                     live_tx_count: None,
-                    found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                    found_timestamp: crate::config::now_iso(),
                 });
             }
 
@@ -115,7 +115,7 @@ impl VerticalMatrixScanner {
                     recorded_tx_count: None,
                     live_balance: None,
                     live_tx_count: None,
-                    found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                    found_timestamp: crate::config::now_iso(),
                 });
             }
 
@@ -130,7 +130,7 @@ impl VerticalMatrixScanner {
                     recorded_tx_count: None,
                     live_balance: None,
                     live_tx_count: None,
-                    found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                    found_timestamp: crate::config::now_iso(),
                 });
             }
         }

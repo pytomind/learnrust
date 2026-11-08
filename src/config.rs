@@ -22,3 +22,8 @@ pub const BTC_SEGWIT_PATH: &str = "m/84'/0'/0'/0/0";
 pub const BTC_LEGACY_PATH: &str = "m/44'/0'/0'/0/0";
 pub const BTC_TAPROOT_PATH: &str = "m/86'/0'/0'/0/0";
 
+pub fn now_iso() -> String {
+    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+}
+
+

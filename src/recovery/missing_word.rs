@@ -265,5 +265,5 @@ impl MissingWordSolver {
 }
 
 fn chrono_now() -> String {
-    format!("{:?}", std::time::SystemTime::now())
+    crate::config::now_iso()
 }

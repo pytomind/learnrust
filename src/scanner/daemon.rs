@@ -197,7 +197,7 @@ impl ScannerDaemon {
                         recorded_tx_count: tx_c,
                         live_balance: None,
                         live_tx_count: None,
-                        found_timestamp: format!("{:?}", std::time::SystemTime::now()),
+                        found_timestamp: crate::config::now_iso(),
                     };
 
                     append_hit_to_json(&config.output_json, &wallet_hit);

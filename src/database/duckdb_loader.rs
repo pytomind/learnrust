@@ -138,10 +138,7 @@ impl DuckDbWalletIndex {
     #[inline]
     pub fn find_origin(&self, address: &str) -> Option<PathBuf> {
         let norm = address.trim().to_lowercase();
-        if let Some(db_path) = self.address_map.get(&norm) {
-            return Some(db_path.clone());
-        }
-        self.find_and_fetch(address).map(|(p, _)| p)
+        self.address_map.get(&norm).cloned()
     }
 
     /// Read single record from a specific DuckDB partition
