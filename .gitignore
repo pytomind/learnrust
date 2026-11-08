@@ -1,0 +1,9 @@
+/target
+**/*.rs.bk
+Cargo.lock
+*.duckdb.wal
+found_wallets.json
+my_secret_phrase.txt
+/data/active-wallets
+/data/dumps
+

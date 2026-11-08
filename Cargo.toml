@@ -1,0 +1,51 @@
+[package]
+name = "learnrust-wallet-checker"
+version = "0.1.0"
+edition = "2021"
+description = "Educational & High-Performance DuckDB BIP-39 Multi-Chain Wallet Search Engine in Rust"
+authors = ["Antigravity Learner"]
+
+[dependencies]
+# BIP-39 Seed Mnemonic & Cryptography
+bip39 = { version = "2.1.0", features = ["rand"] }
+secp256k1 = { version = "0.29.0", features = ["recovery", "global-context"] }
+tiny-keccak = { version = "2.0.2", features = ["keccak"] }
+sha2 = "0.10.8"
+ripemd = "0.1.3"
+hmac = "0.12.1"
+bech32 = "0.11.0"
+bs58 = "0.5.1"
+hex = "0.4.3"
+
+# Embedded DuckDB Columnar Database
+duckdb = { version = "1.1.1", features = ["bundled"] }
+
+# Random Number Generation
+rand = "0.8.5"
+
+# Multi-threading & Asynchronous Runtime
+rayon = "1.10.0"
+tokio = { version = "1.40.0", features = ["full", "io-util"] }
+reqwest = { version = "0.12.7", features = ["json", "stream"] }
+flate2 = "1.0.34"
+futures-util = "0.3.30"
+indicatif = "0.17.8"
+
+# Web API Server & CORS for Namedox UI
+axum = "0.7.5"
+tower-http = { version = "0.5.2", features = ["cors"] }
+
+# CLI Argument Parser & Serialization
+clap = { version = "4.5.18", features = ["derive"] }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+anyhow = "1.0.89"
+walkdir = "2.5.0"
+colored = "2.1.0"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+panic = "abort"
+

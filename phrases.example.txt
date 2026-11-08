@@ -1,0 +1,6 @@
+# Example Seed Phrases for Batch Testing
+# You can put 12-word or 24-word phrases here (one phrase per line)
+abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
+legal winner thank year wave sausage worth useful legal winner thank yellow
+test test test test test test test test test test test junk
+
