@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowHeaders, AllowOrigin, CorsLayer};
 
 use crate::crypto::DerivationEngine;
 use crate::database::{DuckDbWalletIndex, WalletHit};
@@ -84,11 +84,22 @@ impl ApiServer {
             import_error: Arc::new(tokio::sync::RwLock::new(None)),
         });
 
-        // Configure permissive CORS for Namedox frontend (localhost:4200 / any origin)
+        // Configure permissive CORS & Private Network Access for Namedox frontend
+        // Supports https://namedox.com, http://localhost:4200, and all client origins
+        // allow_private_network(true) is required by Chrome PNA when https://namedox.com calls http://localhost:3030
         let cors = CorsLayer::new()
-            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-            .allow_headers(Any)
-            .allow_origin(Any);
+            .allow_origin(AllowOrigin::mirror_request())
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::OPTIONS,
+                Method::PUT,
+                Method::DELETE,
+                Method::PATCH,
+            ])
+            .allow_headers(AllowHeaders::mirror_request())
+            .allow_credentials(true)
+            .allow_private_network(true);
 
         let app = Router::new()
             .route("/health", get(handle_status))
@@ -112,7 +123,7 @@ impl ApiServer {
             port
         );
         println!("   Connected to DuckDB Master & 49 Partitions in RAM");
-        println!("   CORS Enabled for Namedox Angular Client (http://localhost:4200)");
+        println!("   CORS & PNA Enabled for https://namedox.com & http://localhost:4200");
         println!("{}", "═══════════════════════════════════════════════════════════\n".dimmed());
 
         let listener = tokio::net::TcpListener::bind(addr).await?;
