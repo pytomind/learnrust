@@ -1,0 +1,24 @@
+{
+  "name": "learnrust-wallet-checker",
+  "version": "0.1.0",
+  "description": "Educational & High-Performance DuckDB BIP-39 Multi-Chain Wallet Search Engine in Rust",
+  "scripts": {
+    "start": "cargo run --release -- --server",
+    "start:fast": ".\\target\\release\\learnrust-wallet-checker.exe --server",
+    "build": "cargo build --release",
+    "daemon": "cargo run --release -- --daemon",
+    "import": "cargo run --release -- --import-dump --chain both --era all",
+    "cli": "cargo run --release"
+  },
+  "keywords": [
+    "rust",
+    "bip39",
+    "duckdb",
+    "wallet",
+    "ethereum",
+    "bitcoin"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}
+

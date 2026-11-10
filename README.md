@@ -92,6 +92,26 @@ cargo build --release
 
 ---
 
+## ⚡ Quick Start: Starting the Web API Server
+
+You can now start the server using your preferred tool:
+
+```powershell
+# Option A: Using npm (inside learnrust)
+npm start             # Builds & launches server with cargo
+npm run start:fast    # Instant launch using existing release binary
+
+# Option B: Double-click or run script
+.\start-server.bat    # Windows Batch launcher
+.\start-server.ps1    # PowerShell launcher
+
+# Option C: From the namedox project root
+cd ..\namedox
+npm run rust:server
+```
+
+---
+
 ## 💡 How to Use the Engine
 
 ### Mode 1: Interactive Menu (Default)
