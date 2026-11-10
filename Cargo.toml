@@ -2,6 +2,7 @@
 name = "learnrust-wallet-checker"
 version = "0.1.0"
 edition = "2021"
+default-run = "learnrust-wallet-checker"
 description = "Educational & High-Performance DuckDB BIP-39 Multi-Chain Wallet Search Engine in Rust"
 authors = ["Antigravity Learner"]
 

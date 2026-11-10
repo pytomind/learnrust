@@ -33,7 +33,7 @@ use recovery::{MissingWordSolver, VerticalMatrixScanner};
 )]
 struct CliArgs {
     /// Path to data directory containing active_wallets.duckdb and active-wallets folder
-    #[arg(short, long, default_value = "e:/2026/ANTIGRAVITY/learnrust/data")]
+    #[arg(short, long, default_value = "./data")]
     data_dir: PathBuf,
 
     /// 12 or 24-word seed phrase to search (e.g. "abandon abandon ...")
